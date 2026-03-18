@@ -1,0 +1,13 @@
+[project]
+name = "claude-sessions"
+version = "0.1.0"
+description = "Browse and resume Claude Code sessions"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+claude-sessions = "claude_sessions:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
