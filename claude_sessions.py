@@ -133,6 +133,7 @@ def pick_with_fzf(sessions: list[dict]) -> dict | None:
         [
             "fzf",
             "--ansi",
+            "--exact",
             "--no-sort",
             "--prompt=Resume session> ",
             "--height=40%",
