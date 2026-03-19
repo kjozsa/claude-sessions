@@ -4,6 +4,8 @@ Browse and resume recent Claude Code sessions interactively.
 
 Lists all sessions from `~/.claude/projects/` sorted by date (newest first), launches `fzf` for selection, then resumes the chosen session with `claude --resume <uuid>` in its original working directory.
 
+![screenshot](screenshot.png)
+
 ## Requirements
 
 - [`uv`](https://docs.astral.sh/uv/)

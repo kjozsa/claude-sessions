@@ -174,7 +174,8 @@ def resume_session(session: dict) -> None:
     print()
 
     os.chdir(cwd)
-    os.execvp("claude", ["claude", "--resume", session_id])
+    result = subprocess.run(["claude", "--resume", session_id])
+    sys.exit(result.returncode)
 
 
 def main() -> None:
