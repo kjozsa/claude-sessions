@@ -19,6 +19,8 @@ def extract_session_info(jsonl_path: Path) -> dict | None:
     first_user_prompt = None
     last_timestamp = None
     cwd = None
+    custom_title = None
+    ai_title = None
     project_dir = jsonl_path.parent.name  # e.g. -home-kjozsa-workspace-foo
 
     try:
@@ -32,7 +34,19 @@ def extract_session_info(jsonl_path: Path) -> dict | None:
                 except json.JSONDecodeError:
                     continue
 
-                if entry.get("type") != "user":
+                etype = entry.get("type")
+                # /rename writes custom-title; Claude auto-generates ai-title.
+                # Last occurrence wins (latest rename).
+                if etype == "custom-title":
+                    if entry.get("customTitle"):
+                        custom_title = entry["customTitle"]
+                    continue
+                if etype == "ai-title":
+                    if entry.get("aiTitle"):
+                        ai_title = entry["aiTitle"]
+                    continue
+
+                if etype != "user":
                     continue
 
                 ts_str = entry.get("timestamp")
@@ -85,6 +99,7 @@ def extract_session_info(jsonl_path: Path) -> dict | None:
         "session_id": session_id,
         "timestamp": dt_local,
         "first_prompt": first_user_prompt,
+        "title": custom_title or ai_title,
         "cwd": cwd or "",
         "project": human_path,
     }
@@ -110,8 +125,17 @@ def load_all_sessions() -> list[dict]:
     return sessions
 
 
+DIM = "\033[2m"
+RESET = "\033[0m"
+
+
 def format_for_fzf(sessions: list[dict]) -> list[str]:
-    """Format sessions as lines for fzf input."""
+    """Format sessions as lines for fzf input.
+
+    Each line is "<session_id>\t<display>"; the session_id field is hidden
+    from view/search (fzf --with-nth/--nth=2..) and used to map the chosen
+    line back to its session, since --ansi strips color codes from output.
+    """
     lines = []
     for s in sessions:
         dt_str = s["timestamp"].strftime("%Y-%m-%d %H:%M")
@@ -119,7 +143,13 @@ def format_for_fzf(sessions: list[dict]) -> list[str]:
         if len(prompt) > PROMPT_MAX_LEN:
             prompt = prompt[:PROMPT_MAX_LEN] + "…"
         project = s["project"]
-        line = f"{dt_str}  [{project}]  {prompt}"
+        title = s.get("title")
+        if title:
+            title = title.replace("\n", " ")
+            display = f"{title}  {DIM}— {prompt}{RESET}"
+        else:
+            display = prompt
+        line = f"{s['session_id']}\t{dt_str}  [{project}]  {display}"
         lines.append(line)
     return lines
 
@@ -135,13 +165,16 @@ def pick_with_fzf(sessions: list[dict]) -> dict | None:
             "--ansi",
             "--exact",
             "--no-sort",
+            "--delimiter=\t",
+            "--with-nth=2..",
+            "--nth=2..",
             "--prompt=Resume session> ",
             "--height=40%",
             "--layout=reverse",
             "--info=inline",
             "--preview-window=down:3:wrap",
             "--preview",
-            "echo {}",
+            "echo {2..}",
         ],
         input=fzf_input,
         capture_output=True,
@@ -154,10 +187,11 @@ def pick_with_fzf(sessions: list[dict]) -> dict | None:
     if not chosen_line:
         return None
 
-    # Match back to session by index
-    for i, line in enumerate(lines):
-        if line == chosen_line:
-            return sessions[i]
+    # First field is the hidden session_id; map back to the session.
+    chosen_id = chosen_line.split("\t", 1)[0]
+    for s in sessions:
+        if s["session_id"] == chosen_id:
+            return s
 
     return None
 
